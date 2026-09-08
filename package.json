@@ -1,0 +1,48 @@
+{
+  "name": "whaletape-mcp-server",
+  "version": "0.1.1",
+  "description": "WhaleTape MCP server: pay-per-call Hyperliquid whale, funding and open-interest intelligence over x402 (USDC on Base, Solana or Algorand). Consult first, free; then pay per call.",
+  "type": "module",
+  "bin": {
+    "whaletape-mcp-server": "server.mjs"
+  },
+  "files": [
+    "server.mjs",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "x402",
+    "hyperliquid",
+    "whales",
+    "market-data",
+    "agents",
+    "base",
+    "solana",
+    "algorand"
+  ],
+  "homepage": "https://whaletape.xyz",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@scure/base": "^1.2.0",
+    "@solana/kit": "^5.1.0",
+    "@x402/avm": "^2.25.0",
+    "@x402/evm": "^2.25.0",
+    "@x402/fetch": "^2.25.0",
+    "@x402/svm": "^2.25.0",
+    "algosdk": "^3.7.0",
+    "viem": "^2.48.0",
+    "zod": "^3.24.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Elipacosta88/whaletape-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Elipacosta88/whaletape-mcp-server/issues"
+  }
+}
