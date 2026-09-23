@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // WhaleTape MCP server. Consult first (free), then pay per call over x402.
-// Networks: Base (WHALETAPE_EVM_PRIVATE_KEY), Solana (WHALETAPE_SVM_PRIVATE_KEY),
-// Algorand (WHALETAPE_AVM_PRIVATE_KEY). Register only what has a key.
+// Networks: Base, Arbitrum and Robinhood Chain (WHALETAPE_EVM_PRIVATE_KEY),
+// Solana (WHALETAPE_SVM_PRIVATE_KEY), Algorand (WHALETAPE_AVM_PRIVATE_KEY).
+// Register only what has a key.
+import { readFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -9,7 +11,20 @@ import { wrapFetchWithPayment, x402Client, decodePaymentResponseHeader } from "@
 
 const BASE_URL = (process.env.WHALETAPE_API_BASE_URL || "https://whaletape.xyz").replace(/\/$/, "");
 const MAX_USDC = Number(process.env.WHALETAPE_MAX_USDC_PER_CALL || "1.00");
-const PREFER = (process.env.WHALETAPE_PREFER_NETWORK || "").trim(); // e.g. "solana", "eip155", "algorand"
+// USDC has 6 decimals: a cap below one atomic unit (or not a number) can never pay,
+// and String() would print it as 1e-7, which the SDK money parser rejects.
+if (!Number.isFinite(MAX_USDC) || MAX_USDC < 0.000001) {
+  throw new Error(`WHALETAPE_MAX_USDC_PER_CALL must be a number >= 0.000001; got "${process.env.WHALETAPE_MAX_USDC_PER_CALL}"`);
+}
+// Atomic cap, rounded DOWN so it never exceeds the user's limit (the epsilon absorbs 0.0029 * 1e6 = 2899.99...).
+const MAX_ATOMIC = String(Math.floor(MAX_USDC * 1e6 + 1e-6));
+const PREFER = (process.env.WHALETAPE_PREFER_NETWORK || "").trim(); // e.g. "solana", "eip155:42161", "algorand"
+// One source for the version: package.json. Hardcoding it here drifted before.
+const VERSION = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version;
+// Robinhood Chain charges in USDG, which the x402 SDK does not know as a default
+// asset, so its spend control rejects it unless listed. Allow only this contract,
+// only on this chain, capped at the same per-call limit (USDG has 6 decimals).
+const ROBINHOOD_USDG = { network: "eip155:4663", asset: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168" };
 const FREE = ["/preview/whales", "/preview/signals", "/preview/squeeze", "/markets/preview", "/public/stats", "/track-record", "/metrics", "/health"];
 
 // ---------- catalog (free, cached) ----------
@@ -100,7 +115,11 @@ async function buildClient() {
   };
   payingFetch = wrapFetchWithPaymentFromConfig(fetch, {
     schemes,
-    spendControls: { maxAmountPerPayment: `$${MAX_USDC.toFixed(2)}` },
+    spendControls: {
+      // 6 decimals, never toFixed(2): that turned a 0.009 cap into $0.01 and let a 0.01 route through.
+      maxAmountPerPayment: `$${(Number(MAX_ATOMIC) / 1e6).toFixed(6)}`,
+      allowedAssets: [{ ...ROBINHOOD_USDG, maxAmountPerPayment: MAX_ATOMIC }],
+    },
     paymentRequirementsSelector: selector,
   });
 }
@@ -108,7 +127,7 @@ async function buildClient() {
 async function paidCall(path, method, body) {
   if (!payingFetch) await buildClient();
   if (!registered.length) throw new Error("no wallet configured: set WHALETAPE_EVM_PRIVATE_KEY, WHALETAPE_SVM_PRIVATE_KEY or WHALETAPE_AVM_PRIVATE_KEY");
-  const init = { method, headers: { accept: "application/json", "user-agent": "whaletape-mcp/0.1.1" } };
+  const init = { method, headers: { accept: "application/json", "user-agent": `whaletape-mcp/${VERSION}` } };
   if (body !== undefined) { init.headers["content-type"] = "application/json"; init.body = JSON.stringify(body); }
   const r = await payingFetch(`${BASE_URL}${path}`, init);
   const text = await r.text();
@@ -120,11 +139,11 @@ async function paidCall(path, method, body) {
 }
 
 // ---------- MCP ----------
-const server = new McpServer({ name: "whaletape", version: "0.1.1" });
+const server = new McpServer({ name: "whaletape", version: VERSION });
 const text = o => ({ content: [{ type: "text", text: typeof o === "string" ? o : JSON.stringify(o, null, 1) }] });
 
 server.tool("whaletape_consult",
-  "FREE, never bills. Call this first with the user's whole intent about Hyperliquid perps, whales, funding, open interest, liquidations or market flows. Returns which WhaleTape route to call, its price in USDC and the networks that accept payment (Base, Solana, Algorand).",
+  "FREE, never bills. Call this first with the user's whole intent about Hyperliquid perps, whales, funding, open interest, liquidations or market flows. Returns which WhaleTape route to call, its price in USDC and the networks that accept payment (Base, Arbitrum, Robinhood Chain, Solana, Algorand).",
   { intent: z.string().describe("what the user wants, in plain words") },
   async ({ intent }) => text({ suggestions: consult(intent, await catalog()), how_to_pay: "call whaletape_fetch with the path; payment is automatic on the first network you have a key for", max_usdc_per_call: MAX_USDC }));
 
@@ -141,7 +160,7 @@ server.tool("whaletape_free", "FREE. Call a free WhaleTape route (no payment). R
   });
 
 server.tool("whaletape_fetch",
-  "PAID over x402 (USDC). Calls a WhaleTape route and pays the quoted price automatically with the configured wallet (Base, Solana or Algorand). Returns the data and the on-chain receipt. Never pays more than WHALETAPE_MAX_USDC_PER_CALL. A 4xx/5xx answer is never billed.",
+  "PAID over x402 (USDC). Calls a WhaleTape route and pays the quoted price automatically with the configured wallet (Base, Arbitrum, Robinhood Chain, Solana or Algorand). With several options it pays on the first one it can sign; set WHALETAPE_PREFER_NETWORK to choose. Returns the data and the on-chain receipt. Never pays more than WHALETAPE_MAX_USDC_PER_CALL. A 4xx/5xx answer is never billed.",
   { path: z.string().describe("route path, e.g. /premium or /liquidations/BTC or /ask?q=..."),
     method: z.enum(["GET", "POST"]).default("GET"),
     body: z.record(z.any()).optional().describe("JSON body for POST routes (e.g. /alerts)") },

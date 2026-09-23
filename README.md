@@ -2,7 +2,7 @@
 
 MCP server for [WhaleTape](https://whaletape.xyz): pay-per-call Hyperliquid whale,
 funding, open-interest and liquidation intelligence over **x402** (USDC on Base,
-Solana or Algorand). No account, no API key: consult first (free), then pay per call.
+Arbitrum, Solana or Algorand; USDG on Robinhood Chain). No account, no API key: consult first (free), then pay per call.
 
 Agent one-liner: `set up https://whaletape.xyz/skill.md`
 
@@ -14,16 +14,23 @@ claude mcp add whaletape \
   -- npx -y whaletape-mcp-server@latest
 ```
 
-Configure one or more wallets (the first network you can sign for pays):
+Configure one or more wallets. When a route accepts several networks, the MCP
+pays on the first one you can sign for, in the order the 402 lists them; set
+`WHALETAPE_PREFER_NETWORK` to choose.
 
 | env | network | key format |
 |---|---|---|
-| `WHALETAPE_EVM_PRIVATE_KEY` | Base (`eip155:8453`) | `0x` hex |
+| `WHALETAPE_EVM_PRIVATE_KEY` | Base (`eip155:8453`), Arbitrum (`eip155:42161`), Robinhood Chain (`eip155:4663`, pays in USDG) | `0x` hex |
 | `WHALETAPE_SVM_PRIVATE_KEY` | Solana | base58 (Phantom export) |
 | `WHALETAPE_AVM_PRIVATE_KEY` | Algorand | base64, 64 bytes |
 
-Optional: `WHALETAPE_PREFER_NETWORK=solana|eip155|algorand`,
-`WHALETAPE_MAX_USDC_PER_CALL=1.00` (SDK spend control, default $1).
+Optional:
+
+- `WHALETAPE_PREFER_NETWORK` — a network prefix: `solana`, `algorand`, `eip155`,
+  or one chain, e.g. `eip155:42161` (Arbitrum) or `eip155:4663` (Robinhood Chain).
+  With only an EVM key and no preference, Base pays.
+- `WHALETAPE_MAX_USDC_PER_CALL=1.00` — per-call cap (SDK spend control, default $1).
+  The same cap applies to USDG on Robinhood Chain.
 
 ## Tools
 

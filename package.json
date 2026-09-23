@@ -1,7 +1,7 @@
 {
   "name": "whaletape-mcp-server",
-  "version": "0.1.1",
-  "description": "WhaleTape MCP server: pay-per-call Hyperliquid whale, funding and open-interest intelligence over x402 (USDC on Base, Solana or Algorand). Consult first, free; then pay per call.",
+  "version": "0.1.2",
+  "description": "WhaleTape MCP server: pay-per-call Hyperliquid whale, funding and open-interest intelligence over x402 (USDC on Base, Arbitrum, Solana or Algorand; USDG on Robinhood Chain). Consult first, free; then pay per call.",
   "type": "module",
   "bin": {
     "whaletape-mcp-server": "server.mjs"
@@ -23,6 +23,8 @@
     "agents",
     "base",
     "solana",
+    "arbitrum",
+    "robinhood-chain",
     "algorand"
   ],
   "homepage": "https://whaletape.xyz",
@@ -30,10 +32,10 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@scure/base": "^1.2.0",
     "@solana/kit": "^5.1.0",
-    "@x402/avm": "^2.25.0",
-    "@x402/evm": "^2.25.0",
-    "@x402/fetch": "^2.25.0",
-    "@x402/svm": "^2.25.0",
+    "@x402/avm": "^2.27.0",
+    "@x402/evm": "^2.27.0",
+    "@x402/fetch": "^2.27.0",
+    "@x402/svm": "^2.27.0",
     "algosdk": "^3.7.0",
     "viem": "^2.48.0",
     "zod": "^3.24.0"
